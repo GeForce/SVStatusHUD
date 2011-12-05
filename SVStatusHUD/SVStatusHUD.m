@@ -20,10 +20,21 @@
 @interface SVStatusHUD ()
 
 @property (nonatomic, retain) NSTimer *fadeOutTimer;
+@property (nonatomic, assign) UIWindow *previousKeyWindow;
+
+#if __has_feature(objc_arc)
+
+@property (strong, nonatomic, readonly) UIView *hudView;
+@property (strong, nonatomic, readonly) UILabel *stringLabel;
+@property (strong, nonatomic, readonly) SVStatusImage *imageView;
+
+#else
+
 @property (nonatomic, readonly) UIView *hudView;
 @property (nonatomic, readonly) UILabel *stringLabel;
 @property (nonatomic, readonly) SVStatusImage *imageView;
-@property (nonatomic, assign) UIWindow *previousKeyWindow;
+
+#endif
 
 - (void)showWithImage:(UIImage*)image status:(NSString*)string duration:(NSTimeInterval)duration;
 - (void)setStatus:(NSString*)string;
@@ -43,16 +54,22 @@ static SVStatusHUD *sharedView = nil;
 
 - (void)dealloc {
 	
-	if(fadeOutTimer != nil)
-		[fadeOutTimer invalidate], [fadeOutTimer release], fadeOutTimer = nil;
-	
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+    
+	
+#if __has_feature(objc_arc)
+    if(fadeOutTimer != nil)
+		[fadeOutTimer invalidate], fadeOutTimer = nil;
+#else
+    if(fadeOutTimer != nil)
+        [fadeOutTimer invalidate], [fadeOutTimer release], fadeOutTimer = nil;
     
     [hudView release];
     [stringLabel release];
     [imageView release];
     
     [super dealloc];
+#endif
 }
 
 + (SVStatusHUD*)sharedView {
@@ -141,10 +158,18 @@ static SVStatusHUD *sharedView = nil;
 		self.alpha = 1;
 	}
     
+#if __has_feature(objc_arc)
     if(fadeOutTimer != nil)
-		[fadeOutTimer invalidate], [fadeOutTimer release], fadeOutTimer = nil;
+		[fadeOutTimer invalidate], fadeOutTimer = nil;
+    
+    fadeOutTimer = [NSTimer scheduledTimerWithTimeInterval:SVStatusHUDVisibleDuration target:self selector:@selector(dismiss) userInfo:nil repeats:NO];
+    
+#else
+    if(fadeOutTimer != nil)
+        [fadeOutTimer invalidate], [fadeOutTimer release], fadeOutTimer = nil;
 	
 	fadeOutTimer = [[NSTimer scheduledTimerWithTimeInterval:SVStatusHUDVisibleDuration target:self selector:@selector(dismiss) userInfo:nil repeats:NO] retain];
+#endif
     
     [self setNeedsDisplay];
 }
@@ -212,7 +237,12 @@ static SVStatusHUD *sharedView = nil;
                          if(sharedView.alpha == 0) {
                              [[NSNotificationCenter defaultCenter] removeObserver:sharedView];
                              [sharedView.previousKeyWindow makeKeyWindow];
-                             [sharedView release], sharedView = nil;
+                             
+#if !__has_feature(objc_arc)
+                             [sharedView release];
+#endif
+                             
+                             sharedView = nil;
                              
                              // uncomment to make sure UIWindow is gone from app.windows
                              //NSLog(@"%@", [UIApplication sharedApplication].windows);
@@ -290,11 +320,23 @@ static SVStatusHUD *sharedView = nil;
 
 - (void)setImage:(UIImage *)newImage {
     
-    if(image)
-        [image release], image = nil;
+    if(image) {
+        
+#if !__has_feature(objc_arc)
+        [image release];
+#endif
+        
+        image = nil;
+    }
     
     if(newImage) {
+        
+#if __has_feature(objc_arc)
+        image = newImage;
+#else
         image = [newImage retain];
+#endif
+
         [self setNeedsDisplay];
     }
 }
